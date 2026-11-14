@@ -42,6 +42,7 @@ game-saas-telemetry-etl-api/
 ├── .env.example                   # Template de variáveis de ambiente (Zero-Exposure)
 ├── .gitignore                     # Bloqueio de .env, *.db, __pycache__ e logs locais
 ├── README.md                      # Documentação executiva com diagrama e Learning Agility
+├── docs/assets/                   # Evidências visuais de execução (Swagger UI & Idempotência)
 ├── sql/
 │   ├── 01_schema_ddl.sql          # Criação das tabelas (dim_tenants, dim_products, dim_users, fact_telemetry_events)
 │   └── 02_analytical_queries.sql  # Queries SQL puras: DAU/MAU, Retenção, Latência P95 e Receita SaaS/Game
@@ -58,6 +59,18 @@ game-saas-telemetry-etl-api/
     ├── test_sanitizer.py          # Testes unitários da anonimização Zero-Exposure
     └── test_api_etl.py            # Testes de integração dos endpoints e idempotência SQL
 ```
+
+## 📸 Evidências de Execução (Swagger UI, Zero-Exposure & Idempotência)
+
+### 1. Payload de Entrada com Dados Sensíveis (PII) no `POST /api/v1/telemetry/events`
+![Payload de Entrada no Swagger UI](docs/assets/01_swagger_request_payload.png)
+
+### 2. Resposta Idempotente (`201 Created`) + Hash Determinístico SHA-256 (`Zero-Exposure`)
+Ao reenviar o mesmo `event_id` (`evt_demo_recruiter_001`), a API protege o banco relacional (`"inserted_count": 0`, `"ignored_duplicates_in_db": 1`) e retorna apenas o hash anonimizado (`d0b46efc5a70beffb9b91e8d80182577dfc7e710e1d67d3f340d835bde475e2b`):
+![Resposta Idempotente e SHA-256](docs/assets/02_swagger_idempotent_response.png)
+
+### 3. Contratos Tipados Pydantic v2 (`201` & `422 Validation Error`)
+![Contratos OpenAPI 201 e 422](docs/assets/03_openapi_schemas_422.png)
 
 ## 🚀 Como Executar (Quick Start)
 
