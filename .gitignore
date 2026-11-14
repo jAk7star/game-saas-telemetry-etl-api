@@ -1,0 +1,25 @@
+# Environments
+.env
+.venv/
+venv/
+ENV/
+
+# Python cache & build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local SQLite databases & logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
