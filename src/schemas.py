@@ -172,3 +172,69 @@ class AnalyticsSummaryResponse(BaseModel):
     latency_p95_metrics: List[Dict[str, Any]]
     revenue_metrics: List[Dict[str, Any]]
     retention_metrics: List[Dict[str, Any]]
+
+
+class FirestoreSyncRequest(BaseModel):
+    """Contrato para extração ativa (Pull ETL) de uma coleção do Cloud Firestore."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    collection_name: str = Field(
+        default="telemetry_raw_events",
+        min_length=2,
+        max_length=120,
+        description="Nome da coleção de staging no Cloud Firestore.",
+    )
+    limit: int = Field(
+        default=500,
+        ge=1,
+        le=5000,
+        description="Quantidade máxima de documentos a extrair por lote.",
+    )
+    only_unsynced: bool = Field(
+        default=True,
+        description="Se True, ignora documentos já marcados com `etl_synced=True` no Firestore.",
+    )
+    ack_mode: str = Field(
+        default="mark_synced_and_strip_pii",
+        pattern="^(read_only|mark_synced_and_strip_pii|delete_after_ingest)$",
+        description=(
+            "Política pós-extração no Firestore: 'read_only', "
+            "'mark_synced_and_strip_pii' (expurga PII na origem NoSQL) ou 'delete_after_ingest'."
+        ),
+    )
+
+
+class FirestoreSeedDocumentInput(BaseModel):
+    """Documento NoSQL (aninhado estilo Firebase/GA4 ou plano) para popular o Firestore Simulator."""
+
+    doc_id: str = Field(
+        ...,
+        min_length=4,
+        max_length=64,
+        description="ID determinístico do documento no Cloud Firestore (`doc.id`).",
+    )
+    data: Dict[str, Any] = Field(
+        ...,
+        description="Mapa de dados do documento Firestore (suporta sub-mapas `user`, `product`, `tenant`, `metrics`, `context`).",
+    )
+
+
+class FirestoreSyncResponse(BaseModel):
+    """Resposta detalhada da sincronização Cloud Firestore -> Zero-Exposure -> Star Schema SQL."""
+
+    status: str = Field(default="success")
+    firestore_backend_mode: str = Field(
+        ...,
+        description="Modo utilizado ('firebase_admin_sdk' ou 'in_memory_simulator').",
+    )
+    collection_name: str
+    ack_mode: str
+    extracted_from_firestore: int = Field(..., ge=0)
+    acknowledged_in_firestore: int = Field(..., ge=0)
+    deduplicated_in_batch: int = Field(..., ge=0)
+    inserted_in_warehouse: int = Field(..., ge=0)
+    ignored_duplicates_in_warehouse: int = Field(..., ge=0)
+    zero_exposure_applied: bool = Field(default=True)
+    sample_user_hashes: List[str] = Field(default_factory=list)
+
