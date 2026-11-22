@@ -7,7 +7,8 @@ Camada de Persistência Relacional SQL (SQLAlchemy 2.0):
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
@@ -22,23 +23,20 @@ def get_database_url() -> str:
     return os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'telemetry_warehouse.db'}")
 
 
-def create_db_engine(database_url: Optional[str] = None) -> Engine:
+def create_db_engine(database_url: str | None = None) -> Engine:
     url = database_url or get_database_url()
     connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
     return create_engine(url, connect_args=connect_args, future=True)
 
 
-def _split_sql_statements(sql_script: str) -> List[str]:
+def _split_sql_statements(sql_script: str) -> list[str]:
     """Remove comentários de linha (`--`) e divide o script SQL em instruções executáveis."""
-    lines = [
-        line for line in sql_script.splitlines()
-        if not line.strip().startswith("--")
-    ]
+    lines = [line for line in sql_script.splitlines() if not line.strip().startswith("--")]
     cleaned_script = "\n".join(lines)
     return [stmt.strip() for stmt in cleaned_script.split(";") if stmt.strip()]
 
 
-def init_database(engine: Optional[Engine] = None) -> Engine:
+def init_database(engine: Engine | None = None) -> Engine:
     """Executa o script DDL (`sql/01_schema_ddl.sql`) para criar tabelas e índices."""
     db_engine = engine or create_db_engine()
     ddl_script = DDL_FILE_PATH.read_text(encoding="utf-8")
@@ -54,8 +52,8 @@ def init_database(engine: Optional[Engine] = None) -> Engine:
 
 def persist_etl_batch(
     batch_result: ETLBatchResult,
-    engine: Optional[Engine] = None,
-) -> Tuple[int, int]:
+    engine: Engine | None = None,
+) -> tuple[int, int]:
     """
     Persiste dimensões e fatos no Star Schema de maneira transacional e idempotente.
     Retorna `(inserted_count, ignored_duplicates_in_db)`.
@@ -132,15 +130,11 @@ def persist_etl_batch(
             conn.execute(upsert_users_sql, users_records)
 
         # Contabiliza exatamente quantos eventos novos foram inseridos (idempotência)
-        before_count = conn.execute(
-            text("SELECT COUNT(*) FROM fact_telemetry_events")
-        ).scalar_one()
+        before_count = conn.execute(text("SELECT COUNT(*) FROM fact_telemetry_events")).scalar_one()
 
         conn.execute(insert_fact_sql, facts_records)
 
-        after_count = conn.execute(
-            text("SELECT COUNT(*) FROM fact_telemetry_events")
-        ).scalar_one()
+        after_count = conn.execute(text("SELECT COUNT(*) FROM fact_telemetry_events")).scalar_one()
 
         inserted_count = int(after_count - before_count)
 
@@ -148,7 +142,7 @@ def persist_etl_batch(
     return inserted_count, ignored_duplicates
 
 
-def execute_analytical_queries(engine: Optional[Engine] = None) -> Dict[str, Any]:
+def execute_analytical_queries(engine: Engine | None = None) -> dict[str, Any]:
     """
     Executa as 4 consultas analíticas SQL de `sql/02_analytical_queries.sql`
     e retorna os indicadores consolidados para consumo via API/BI.
@@ -158,14 +152,10 @@ def execute_analytical_queries(engine: Optional[Engine] = None) -> Dict[str, Any
     statements = _split_sql_statements(raw_sql)
 
     with db_engine.connect() as conn:
-        total_events = conn.execute(
-            text("SELECT COUNT(*) FROM fact_telemetry_events")
-        ).scalar_one()
-        total_users = conn.execute(
-            text("SELECT COUNT(*) FROM dim_users")
-        ).scalar_one()
+        total_events = conn.execute(text("SELECT COUNT(*) FROM fact_telemetry_events")).scalar_one()
+        total_users = conn.execute(text("SELECT COUNT(*) FROM dim_users")).scalar_one()
 
-        results: List[List[Dict[str, Any]]] = []
+        results: list[list[dict[str, Any]]] = []
         for stmt in statements:
             rows = conn.execute(text(stmt)).mappings().all()
             results.append([dict(r) for r in rows])

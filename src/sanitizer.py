@@ -8,33 +8,25 @@ import hashlib
 import json
 import os
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 DEFAULT_SALT = os.getenv("ZERO_EXPOSURE_SALT", "antigravity-lgpd-zero-exposure-salt-2026")
 
 # Expressões Regulares pré-compiladas para detecção e mascaramento de PII
-EMAIL_REGEX = re.compile(
-    r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
-)
+EMAIL_REGEX = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 # CPF formatado (000.000.000-00) ou sequência isolada de 11 dígitos
-CPF_REGEX = re.compile(
-    r"\b(?:\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})\b"
-)
+CPF_REGEX = re.compile(r"\b(?:\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})\b")
 # IPv4 (ex: 192.168.1.100)
-IPV4_REGEX = re.compile(
-    r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b"
-)
+IPV4_REGEX = re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b")
 # IPv6 simplificado
-IPV6_REGEX = re.compile(
-    r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b"
-)
+IPV6_REGEX = re.compile(r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b")
 # Padrões explícitos de nome em logs (ex: "user_name=João Silva", "nome: Maria Souza")
 NAME_KV_REGEX = re.compile(
     r"(?i)\b(nome|name|user_name|cliente|jogador|player_name)\s*[:=]\s*([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+)"
 )
 
 
-def generate_user_hash(raw_identifier: str, salt: Optional[str] = None) -> str:
+def generate_user_hash(raw_identifier: str, salt: str | None = None) -> str:
     """
     Gera um hash SHA-256 determinístico (64 caracteres hexadecimais) a partir de
     qualquer identificador bruto (e-mail, CPF, ID de conta), normalizando caixa e espaços.
@@ -48,11 +40,11 @@ def generate_user_hash(raw_identifier: str, salt: Optional[str] = None) -> str:
     if re.fullmatch(r"\d{3}\.\d{3}\.\d{3}-\d{2}", normalized):
         normalized = re.sub(r"\D", "", normalized)
 
-    payload = f"{effective_salt}:{normalized}".encode("utf-8")
+    payload = f"{effective_salt}:{normalized}".encode()
     return hashlib.sha256(payload).hexdigest()
 
 
-def mask_ip_address(ip: Optional[str]) -> str:
+def mask_ip_address(ip: str | None) -> str:
     """
     Mascara endereços IPv4/IPv6 preservando apenas o prefixo de rede para diagnóstico
     regional sem expor o dispositivo individual (LGPD).
@@ -71,7 +63,7 @@ def mask_ip_address(ip: Optional[str]) -> str:
     return "[REDACTED_IP]"
 
 
-def sanitize_free_text(text: Optional[str], known_name: Optional[str] = None) -> str:
+def sanitize_free_text(text: str | None, known_name: str | None = None) -> str:
     """
     Remove e mascara qualquer ocorrência de e-mail, CPF, IPv4, IPv6 e nomes próprios
     em textos de log ou metadados abertos.
@@ -99,7 +91,7 @@ def sanitize_free_text(text: Optional[str], known_name: Optional[str] = None) ->
     return sanitized
 
 
-def sanitize_event_payload(raw_event: Dict[str, Any], salt: Optional[str] = None) -> Dict[str, Any]:
+def sanitize_event_payload(raw_event: dict[str, Any], salt: str | None = None) -> dict[str, Any]:
     """
     Aplica a política Zero-Exposure em um dicionário de evento:
     1. Converte `user_identifier` (ou `user_email`/`user_cpf`) em `user_hash` SHA-256 determinístico.
@@ -138,7 +130,9 @@ def sanitize_event_payload(raw_event: Dict[str, Any], salt: Optional[str] = None
     return {
         "event_id": str(raw_event["event_id"]).strip(),
         "tenant_id": str(raw_event["tenant_id"]).strip(),
-        "tenant_name": sanitize_free_text(raw_event.get("tenant_name") or "Default Tenant", known_name=known_name),
+        "tenant_name": sanitize_free_text(
+            raw_event.get("tenant_name") or "Default Tenant", known_name=known_name
+        ),
         "product_id": str(raw_event["product_id"]).strip(),
         "product_name": str(raw_event.get("product_name") or "Unknown Product").strip(),
         "category": str(raw_event["category"]).strip().upper(),

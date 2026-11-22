@@ -2,15 +2,15 @@
 Testes de Integração da API FastAPI, Pipeline ETL Pandas e Persistência Idempotente SQL.
 """
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from scripts.generate_mock_events import generate_mock_events
@@ -90,9 +90,11 @@ def test_single_event_ingestion_idempotency_and_zero_exposure(test_client):
     with engine.connect() as conn:
         count = conn.execute(text("SELECT COUNT(*) FROM fact_telemetry_events")).scalar_one()
         assert count == 1
-        row = conn.execute(
-            text("SELECT user_hash, sanitized_metadata FROM fact_telemetry_events")
-        ).mappings().one()
+        row = (
+            conn.execute(text("SELECT user_hash, sanitized_metadata FROM fact_telemetry_events"))
+            .mappings()
+            .one()
+        )
         assert "gabriel.santos@gamer.com" not in row["user_hash"]
         assert "gabriel.santos@gamer.com" not in row["sanitized_metadata"]
         assert "111.222.333-44" not in row["sanitized_metadata"]
@@ -251,4 +253,3 @@ def test_batch_2000_synthetic_events_and_analytical_sql_queries(test_client):
     assert len(summary["latency_p95_metrics"]) == 4
     assert len(summary["revenue_metrics"]) >= 2
     assert len(summary["retention_metrics"]) == 2
-

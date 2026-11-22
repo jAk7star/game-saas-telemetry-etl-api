@@ -4,9 +4,9 @@ Garante determinismo do hash SHA-256 e bloqueio total de PII (e-mail, CPF, IP e 
 """
 
 import json
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:

@@ -4,7 +4,8 @@ Contratos Pydantic v2 para validação rigorosa de entrada (HTTP 422) e resposta
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -50,7 +51,7 @@ class TelemetryEventInput(BaseModel):
         description="Identificador do tenant (organização ou estúdio).",
         examples=["tenant_valkyrie_studios"],
     )
-    tenant_name: Optional[str] = Field(
+    tenant_name: str | None = Field(
         default="Default Tenant",
         max_length=120,
         description="Nome comercial do tenant.",
@@ -79,17 +80,17 @@ class TelemetryEventInput(BaseModel):
         description="Identificador bruto do usuário (e-mail, CPF ou ID). Será anonimizado via SHA-256.",
         examples=["player.one@example.com"],
     )
-    user_name: Optional[str] = Field(
+    user_name: str | None = Field(
         default=None,
         max_length=120,
         description="Nome opcional do usuário (descartado/mascarado na camada Zero-Exposure).",
     )
-    user_cpf: Optional[str] = Field(
+    user_cpf: str | None = Field(
         default=None,
         max_length=20,
         description="CPF opcional do usuário (descartado/mascarado na camada Zero-Exposure).",
     )
-    ip_address: Optional[str] = Field(
+    ip_address: str | None = Field(
         default=None,
         max_length=64,
         description="Endereço IP de origem (mascarado na camada Zero-Exposure).",
@@ -102,25 +103,25 @@ class TelemetryEventInput(BaseModel):
         ...,
         description="Tipo do evento ('MATCH_END', 'API_CALL', 'PURCHASE', 'ERROR_TIMEOUT').",
     )
-    session_duration_sec: Optional[int] = Field(
+    session_duration_sec: int | None = Field(
         default=0,
         ge=0,
         le=86400,
         description="Duração da sessão em segundos (>= 0).",
     )
-    latency_ms: Optional[float] = Field(
+    latency_ms: float | None = Field(
         default=0.0,
         ge=0.0,
         le=300000.0,
         description="Latência de rede/API medida em milissegundos (>= 0).",
     )
-    revenue_brl: Optional[float] = Field(
+    revenue_brl: float | None = Field(
         default=0.0,
         ge=0.0,
         le=1000000.0,
         description="Receita associada ao evento em Reais (BRL >= 0).",
     )
-    raw_metadata: Optional[str] = Field(
+    raw_metadata: str | None = Field(
         default=None,
         max_length=1000,
         description="Texto livre de log/diagnóstico (passará por sanitização Regex contra PII).",
@@ -143,7 +144,7 @@ class TelemetryBatchInput(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    events: List[TelemetryEventInput] = Field(
+    events: list[TelemetryEventInput] = Field(
         ...,
         min_length=1,
         max_length=5000,
@@ -160,7 +161,7 @@ class IngestionResponse(BaseModel):
     inserted_count: int = Field(..., ge=0)
     ignored_duplicates_in_db: int = Field(..., ge=0)
     zero_exposure_applied: bool = Field(default=True)
-    sample_user_hashes: List[str] = Field(default_factory=list)
+    sample_user_hashes: list[str] = Field(default_factory=list)
 
 
 class AnalyticsSummaryResponse(BaseModel):
@@ -168,10 +169,10 @@ class AnalyticsSummaryResponse(BaseModel):
 
     total_events: int
     total_unique_users: int
-    dau_mau_metrics: List[Dict[str, Any]]
-    latency_p95_metrics: List[Dict[str, Any]]
-    revenue_metrics: List[Dict[str, Any]]
-    retention_metrics: List[Dict[str, Any]]
+    dau_mau_metrics: list[dict[str, Any]]
+    latency_p95_metrics: list[dict[str, Any]]
+    revenue_metrics: list[dict[str, Any]]
+    retention_metrics: list[dict[str, Any]]
 
 
 class FirestoreSyncRequest(BaseModel):
@@ -214,7 +215,7 @@ class FirestoreSeedDocumentInput(BaseModel):
         max_length=64,
         description="ID determinístico do documento no Cloud Firestore (`doc.id`).",
     )
-    data: Dict[str, Any] = Field(
+    data: dict[str, Any] = Field(
         ...,
         description="Mapa de dados do documento Firestore (suporta sub-mapas `user`, `product`, `tenant`, `metrics`, `context`).",
     )
@@ -236,5 +237,4 @@ class FirestoreSyncResponse(BaseModel):
     inserted_in_warehouse: int = Field(..., ge=0)
     ignored_duplicates_in_warehouse: int = Field(..., ge=0)
     zero_exposure_applied: bool = Field(default=True)
-    sample_user_hashes: List[str] = Field(default_factory=list)
-
+    sample_user_hashes: list[str] = Field(default_factory=list)

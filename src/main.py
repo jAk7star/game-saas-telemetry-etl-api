@@ -3,7 +3,7 @@ Entrypoint FastAPI + Swagger/OpenAPI (/docs) para o pipeline Game & SaaS Telemet
 """
 
 from contextlib import asynccontextmanager
-from typing import Optional
+
 from fastapi import Depends, FastAPI, status
 from sqlalchemy.engine import Engine
 
@@ -151,7 +151,7 @@ def ingest_batch_events(
 )
 def seed_firestore_collection(
     collection_name: str = "telemetry_raw_events",
-    custom_doc: Optional[FirestoreSeedDocumentInput] = None,
+    custom_doc: FirestoreSeedDocumentInput | None = None,
     firestore_connector: FirestoreETLConnector = Depends(get_firestore_connector),
 ):
     """
@@ -242,4 +242,3 @@ def get_analytics_summary(
     init_database(engine)
     metrics = execute_analytical_queries(engine=engine)
     return AnalyticsSummaryResponse(**metrics)
-

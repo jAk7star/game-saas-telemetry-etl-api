@@ -7,12 +7,12 @@ Gerador Sintético de 2.000 Eventos Mistos (Games & SaaS Enterprise) com Sujeira
 - Distribuição temporal em múltiplos dias para cálculo realista de DAU/MAU, Retenção e P95
 """
 
-from datetime import datetime, timedelta, timezone
 import json
-from pathlib import Path
 import random
 import sys
-from typing import Any, Dict, List
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
 
 # Garante importação do pacote `src` ao rodar diretamente via CLI
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -59,17 +59,33 @@ PRODUCTS_CATALOG = [
 ]
 
 SAMPLE_FIRST_NAMES = [
-    "Lucas", "Mariana", "Gabriel", "Beatriz", "Rafael",
-    "Fernanda", "Thiago", "Camila", "Bruno", "Juliana",
+    "Lucas",
+    "Mariana",
+    "Gabriel",
+    "Beatriz",
+    "Rafael",
+    "Fernanda",
+    "Thiago",
+    "Camila",
+    "Bruno",
+    "Juliana",
 ]
 SAMPLE_LAST_NAMES = [
-    "Silva", "Oliveira", "Santos", "Souza", "Pereira",
-    "Costa", "Rodrigues", "Almeida", "Nascimento", "Lima",
+    "Silva",
+    "Oliveira",
+    "Santos",
+    "Souza",
+    "Pereira",
+    "Costa",
+    "Rodrigues",
+    "Almeida",
+    "Nascimento",
+    "Lima",
 ]
 TIERS = ["FREE", "PRO", "ENTERPRISE"]
 
 
-def build_synthetic_users(num_users: int = 180, seed: int = 42) -> List[Dict[str, str]]:
+def build_synthetic_users(num_users: int = 180, seed: int = 42) -> list[dict[str, str]]:
     rng = random.Random(seed)
     users = []
     for idx in range(1, num_users + 1):
@@ -95,7 +111,7 @@ def build_synthetic_users(num_users: int = 180, seed: int = 42) -> List[Dict[str
     return users
 
 
-def generate_mock_events(total_events: int = 2000, seed: int = 42) -> List[Dict[str, Any]]:
+def generate_mock_events(total_events: int = 2000, seed: int = 42) -> list[dict[str, Any]]:
     """
     Gera `total_events` eventos mistos de Games e SaaS com anomalias controladas:
     - ~5% de eventos duplicados (mesmo `event_id` simulando retry de rede)
@@ -106,7 +122,7 @@ def generate_mock_events(total_events: int = 2000, seed: int = 42) -> List[Dict[
     users = build_synthetic_users(num_users=180, seed=seed)
     base_time = datetime(2026, 11, 1, 12, 0, 0, tzinfo=timezone.utc)
 
-    events: List[Dict[str, Any]] = []
+    events: list[dict[str, Any]] = []
     unique_target = int(total_events * 0.95)
 
     for i in range(1, unique_target + 1):
@@ -119,7 +135,9 @@ def generate_mock_events(total_events: int = 2000, seed: int = 42) -> List[Dict[
                 weights=[0.60, 0.15, 0.08, 0.17],
                 k=1,
             )[0]
-            session_sec = rng.randint(180, 3600) if event_type != "API_CALL" else rng.randint(5, 120)
+            session_sec = (
+                rng.randint(180, 3600) if event_type != "API_CALL" else rng.randint(5, 120)
+            )
             base_latency = rng.uniform(18.0, 95.0)
         else:
             event_type = rng.choices(
@@ -153,9 +171,7 @@ def generate_mock_events(total_events: int = 2000, seed: int = 42) -> List[Dict[
 
         day_offset = rng.randint(0, 13)
         minute_offset = rng.randint(0, 1439)
-        occurred_at = (
-            base_time + timedelta(days=day_offset, minutes=minute_offset)
-        ).isoformat()
+        occurred_at = (base_time + timedelta(days=day_offset, minutes=minute_offset)).isoformat()
 
         # Sujeira intencional de PII em texto livre
         dirty_metadata = (
@@ -165,9 +181,7 @@ def generate_mock_events(total_events: int = 2000, seed: int = 42) -> List[Dict[
 
         # Varia formato de user_identifier (às vezes caixa alta/espaços para testar normalização)
         raw_identifier = (
-            f"  {user['user_identifier'].upper()}  "
-            if i % 7 == 0
-            else user["user_identifier"]
+            f"  {user['user_identifier'].upper()}  " if i % 7 == 0 else user["user_identifier"]
         )
 
         events.append(
@@ -212,7 +226,9 @@ def main() -> None:
 
     engine = create_db_engine()
     init_database(engine)
-    print("[2/4] Star Schema inicializado (dim_tenants, dim_products, dim_users, fact_telemetry_events)")
+    print(
+        "[2/4] Star Schema inicializado (dim_tenants, dim_products, dim_users, fact_telemetry_events)"
+    )
 
     etl_result = transform_events_batch(raw_events)
     print(

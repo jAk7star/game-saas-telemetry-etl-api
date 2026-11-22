@@ -8,7 +8,8 @@ Pipeline ETL em lote com Pandas:
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import pandas as pd
 
 from src.sanitizer import sanitize_event_payload
@@ -28,12 +29,12 @@ class ETLBatchResult:
     dim_products_df: pd.DataFrame
     dim_users_df: pd.DataFrame
     fact_events_df: pd.DataFrame
-    sample_user_hashes: List[str]
+    sample_user_hashes: list[str]
 
 
 def transform_events_batch(
-    raw_events: List[Dict[str, Any]],
-    salt: Optional[str] = None,
+    raw_events: list[dict[str, Any]],
+    salt: str | None = None,
 ) -> ETLBatchResult:
     """
     Executa o pipeline completo de higienização, tipagem e deduplicação em lote via Pandas.
@@ -52,7 +53,7 @@ def transform_events_batch(
         )
 
     # 1. Camada Zero-Exposure em cada registro de entrada
-    sanitized_rows: List[Dict[str, Any]] = []
+    sanitized_rows: list[dict[str, Any]] = []
     for item in raw_events:
         if hasattr(item, "model_dump"):
             payload = item.model_dump()

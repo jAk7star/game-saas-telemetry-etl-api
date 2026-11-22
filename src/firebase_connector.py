@@ -11,11 +11,11 @@ Como o Firebase (Cloud Firestore) funciona nesta arquitetura:
    - `FirestoreETLConnector`: Conector Dual-Mode que usa `firebase-admin` quando `FIREBASE_SERVICE_ACCOUNT_PATH` ou `FIRESTORE_EMULATOR_HOST` está configurado, ou opera sobre o simulador In-Memory por padrão, gerenciando o ciclo de vida pós-extração (`read_only`, `mark_synced_and_strip_pii`, `delete_after_ingest`).
 """
 
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 class FirestoreAckMode(str, Enum):
@@ -31,9 +31,9 @@ class SimulatedDocumentSnapshot:
     """Representa um DocumentSnapshot do Cloud Firestore (`doc.id`, `doc.to_dict()`)."""
 
     id: str
-    _data: Dict[str, Any] = field(default_factory=dict)
+    _data: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return dict(self._data)
 
 
@@ -45,14 +45,14 @@ class InMemoryFirestoreStore:
     """
 
     def __init__(self) -> None:
-        self._collections: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        self._collections: dict[str, dict[str, dict[str, Any]]] = {}
 
     def seed_default_collection(self, collection_name: str = "telemetry_raw_events") -> int:
         """
         Popula a coleção com documentos realistas aninhados (estilo Firebase/GA4)
         e documentos planos contendo PII (e-mail, CPF, IP, nome) para demonstrar a higienização.
         """
-        sample_docs: Dict[str, Dict[str, Any]] = {
+        sample_docs: dict[str, dict[str, Any]] = {
             "fs_doc_game_match_001": {
                 "event_type": "MATCH_END",
                 "occurred_at": "2026-11-15T14:20:00Z",
@@ -167,7 +167,7 @@ class InMemoryFirestoreStore:
             col[doc_id] = dict(payload)
         return len(sample_docs)
 
-    def upsert_document(self, collection_name: str, doc_id: str, data: Dict[str, Any]) -> None:
+    def upsert_document(self, collection_name: str, doc_id: str, data: dict[str, Any]) -> None:
         col = self._collections.setdefault(collection_name, {})
         col[doc_id] = dict(data)
 
@@ -176,9 +176,9 @@ class InMemoryFirestoreStore:
         collection_name: str,
         limit: int = 500,
         only_unsynced: bool = True,
-    ) -> List[SimulatedDocumentSnapshot]:
+    ) -> list[SimulatedDocumentSnapshot]:
         col = self._collections.get(collection_name, {})
-        snapshots: List[SimulatedDocumentSnapshot] = []
+        snapshots: list[SimulatedDocumentSnapshot] = []
         for doc_id, doc_data in col.items():
             if only_unsynced and doc_data.get("etl_synced") is True:
                 continue
@@ -225,7 +225,7 @@ class InMemoryFirestoreStore:
         col = self._collections.get(collection_name, {})
         col.pop(doc_id, None)
 
-    def get_document(self, collection_name: str, doc_id: str) -> Optional[Dict[str, Any]]:
+    def get_document(self, collection_name: str, doc_id: str) -> dict[str, Any] | None:
         col = self._collections.get(collection_name, {})
         if doc_id in col:
             return dict(col[doc_id])
@@ -235,7 +235,7 @@ class InMemoryFirestoreStore:
         return len(self._collections.get(collection_name, {}))
 
 
-def normalize_firestore_document(doc_id: str, raw_doc: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_firestore_document(doc_id: str, raw_doc: dict[str, Any]) -> dict[str, Any]:
     """
     Normaliza (flattens) um documento do Cloud Firestore (seja ele aninhado estilo Firebase/GA4
     ou plano) para o formato esperado pelo `TelemetryEventInput` / `transform_events_batch`.
@@ -255,11 +255,19 @@ def normalize_firestore_document(doc_id: str, raw_doc: Dict[str, Any]) -> Dict[s
     metrics_map = raw_doc.get("metrics") if isinstance(raw_doc.get("metrics"), dict) else {}
 
     event_id = str(raw_doc.get("event_id") or doc_id).strip()
-    tenant_id = str(raw_doc.get("tenant_id") or tenant_map.get("id") or "tenant_firebase_default").strip()
-    tenant_name = str(raw_doc.get("tenant_name") or tenant_map.get("name") or "Firebase Default Tenant").strip()
+    tenant_id = str(
+        raw_doc.get("tenant_id") or tenant_map.get("id") or "tenant_firebase_default"
+    ).strip()
+    tenant_name = str(
+        raw_doc.get("tenant_name") or tenant_map.get("name") or "Firebase Default Tenant"
+    ).strip()
 
-    product_id = str(raw_doc.get("product_id") or product_map.get("id") or "prod_firebase_app").strip()
-    product_name = str(raw_doc.get("product_name") or product_map.get("name") or "Firebase App").strip()
+    product_id = str(
+        raw_doc.get("product_id") or product_map.get("id") or "prod_firebase_app"
+    ).strip()
+    product_name = str(
+        raw_doc.get("product_name") or product_map.get("name") or "Firebase App"
+    ).strip()
     category = str(raw_doc.get("category") or product_map.get("category") or "GAME").strip().upper()
 
     user_identifier = str(
@@ -283,9 +291,7 @@ def normalize_firestore_document(doc_id: str, raw_doc: Dict[str, Any]) -> Dict[s
         else metrics_map.get("session_duration_sec", 0)
     )
     latency_ms = (
-        raw_doc.get("latency_ms")
-        if "latency_ms" in raw_doc
-        else metrics_map.get("latency_ms", 0.0)
+        raw_doc.get("latency_ms") if "latency_ms" in raw_doc else metrics_map.get("latency_ms", 0.0)
     )
     revenue_brl = (
         raw_doc.get("revenue_brl")
@@ -326,7 +332,7 @@ class FirestoreETLConnector:
       demonstrações no Swagger UI e testes automatizados (`pytest`).
     """
 
-    def __init__(self, memory_store: Optional[InMemoryFirestoreStore] = None) -> None:
+    def __init__(self, memory_store: InMemoryFirestoreStore | None = None) -> None:
         self.memory_store = memory_store or InMemoryFirestoreStore()
         if self.memory_store.count_documents("telemetry_raw_events") == 0:
             self.memory_store.seed_default_collection("telemetry_raw_events")
@@ -357,7 +363,7 @@ class FirestoreETLConnector:
         limit: int = 500,
         only_unsynced: bool = True,
         ack_mode: FirestoreAckMode = FirestoreAckMode.MARK_SYNCED_AND_STRIP_PII,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         Extrai documentos da coleção do Cloud Firestore, normaliza o schema NoSQL (aninhado ou plano)
         para o contrato do pipeline ETL e aplica a política de ciclo de vida (`ack_mode`).
@@ -370,7 +376,7 @@ class FirestoreETLConnector:
             query = col_ref.limit(limit)
             docs = list(query.stream())
 
-            normalized: List[Dict[str, Any]] = []
+            normalized: list[dict[str, Any]] = []
             ack_count = 0
             for snap in docs:
                 raw_data = snap.to_dict() or {}
@@ -402,7 +408,7 @@ class FirestoreETLConnector:
             limit=limit,
             only_unsynced=only_unsynced,
         )
-        normalized_events: List[Dict[str, Any]] = []
+        normalized_events: list[dict[str, Any]] = []
         ack_count = 0
 
         for snap in snapshots:
